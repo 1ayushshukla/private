@@ -1,23 +1,22 @@
 package com.example.map3
 
 import android.annotation.SuppressLint
-import android.content.DialogInterface
 import android.content.pm.PackageManager
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
-import android.os.Build
+import android.location.LocationListener
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.PersistableBundle
 import android.util.Log
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.CameraUpdate
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
@@ -26,14 +25,17 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.android.gms.tasks.Task
-import java.nio.file.attribute.AclEntry.Builder
-import java.util.SimpleTimeZone
+import java.io.IOException
+import java.util.*
+import kotlin.collections.ArrayList
 
-class MainActivity : AppCompatActivity() , OnMapReadyCallback{
+class MainActivity : AppCompatActivity() , OnMapReadyCallback, LocationListener, GoogleMap.OnCameraMoveListener, GoogleMap.OnCameraMoveStartedListener, GoogleMap.OnCameraIdleListener{
 
     private var mMap: GoogleMap? = null
     lateinit var mapView: MapView
     private var MAP_VIEW_BUNDLE_KEY = "MapViewBundleKey"
+
+    lateinit var tvCurrentAddress: TextView
 
 
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
@@ -63,6 +65,9 @@ class MainActivity : AppCompatActivity() , OnMapReadyCallback{
             return
         }
         mMap!!.isMyLocationEnabled
+        mMap!!.setOnCameraMoveListener(this)
+        mMap!!.setOnCameraMoveStartedListener(this)
+        mMap!!.setOnCameraIdleListener(this)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,6 +75,7 @@ class MainActivity : AppCompatActivity() , OnMapReadyCallback{
         setContentView(R.layout.activity_main)
 
         mapView = findViewById<MapView>(R.id.map1)
+        tvCurrentAddress = findViewById<TextView>(R.id.tvAdd)
 
         //-------------------------PERMISSION BLOCK BEGIN--------------------------//
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()){ permissions ->
@@ -149,7 +155,7 @@ class MainActivity : AppCompatActivity() , OnMapReadyCallback{
             location.addOnCompleteListener(object : OnCompleteListener<Location> {
                 override fun onComplete(loc: Task<Location>) {
                     if(loc.isSuccessful){
-                        val currentLocation = loc.result as Location?
+                        val currentLocation = loc.result
                         if(currentLocation != null){
                             Toast.makeText(this@MainActivity, "Current Location Found.", Toast.LENGTH_SHORT).show()
                             //call the moveCamera() function
@@ -176,5 +182,51 @@ class MainActivity : AppCompatActivity() , OnMapReadyCallback{
     }
     //-------------------------LOCATION FUN END--------------------------//
 
+
+    //-------------------------ADDRESS FUNCTIONALITY BEGIN--------------------------//
+    override fun onLocationChanged(location: Location) {
+        val geocoder = Geocoder(this, Locale.getDefault())
+        var address: List<Address>? = null
+        try {
+            address = geocoder.getFromLocation(location.latitude, location.longitude,1)
+        }catch (e: IOException){
+            e.printStackTrace()
+        }
+        setAddress(address!![0])
+    }
+
+    private fun setAddress(address: Address) {
+        if(address != null){
+            if(address.getAddressLine(0) != null){
+                tvCurrentAddress!!.text = address.getAddressLine(0)
+            }
+            if(address.getAddressLine(1) != null){
+                tvCurrentAddress!!.text = tvCurrentAddress.text.toString() + address.getAddressLine(1).toString()
+            }
+        }
+    }
+
+    override fun onCameraMove() {
+
+    }
+
+    override fun onCameraMoveStarted(p0: Int) {
+
+    }
+
+    override fun onCameraIdle() {
+        val geocoder = Geocoder(this, Locale.getDefault())
+        var address: List<Address>? = null
+        try {
+            address = geocoder.getFromLocation(mMap!!.cameraPosition.target.latitude, mMap!!.cameraPosition.target.longitude, 1)
+            setAddress(address!![0])
+        }catch (e: java.lang.IndexOutOfBoundsException){
+            e.printStackTrace()
+        }catch (e: IOException){
+            e.printStackTrace()
+        }
+    }
+
+    //-------------------------ADDRESS FUNCTIONALITY END--------------------------//
 
 }
